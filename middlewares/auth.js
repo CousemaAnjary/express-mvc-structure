@@ -1,33 +1,43 @@
 const jwt = require('jsonwebtoken');
-const { secretKey } = require('../config'); // Importer la clé secrète depuis config.js
+const { secretKey } = require('../config');
+const { User } = require('../models');
 
-function auth(req, res, next) {
-    const token = req.cookies.authToken;
+//  Middleware pour vérifier si l'utilisateur est authentifié
+
+const auth = async (req, res, next) => {
+    const token = req.cookies.authToken; // Récupérer le token JWT depuis les cookies
+
     if (!token) {
         return res.redirect('/login'); // Rediriger vers login si non connecté
     }
 
     try {
-        const decoded = jwt.verify(token, secretKey);
-        req.user = decoded; // Stocker les informations de l'utilisateur décodées dans la requête
+        const decoded = jwt.verify(token, secretKey); // Vérifier le token JWT
+        const user = await User.findByPk(decoded.userId); // Trouver l'utilisateur par ID
+
+        if (!user) {
+            return res.redirect('/login'); // Rediriger vers login si l'utilisateur n'existe pas
+        }
+
+        req.user = user; // Stocker les informations de l'utilisateur dans la requête
         next(); // Continuer si l'utilisateur est connecté
+
     } catch (err) {
         res.redirect('/login');
     }
+
 }
 
-function guest(req, res, next) {
-    const token = req.cookies.authToken;
+// Middleware pour vérifier si l'utilisateur est un invité (non connecté)
+
+const guest = (req, res, next) => {
+    const token = req.cookies.authToken; // Récupérer le token JWT depuis les cookies
+
     if (token) {
-        try {
-            jwt.verify(token, secretKey);
-            return res.redirect('/admin/dashboard'); // Rediriger vers le dashboard si déjà connecté
-        } catch (err) {
-            next();
-        }
-    } else {
-        next(); // Continuer si l'utilisateur est un invité
+        return res.redirect('/admin/dashboard'); // Rediriger les utilisateurs connectés
     }
-}
+
+    next(); // Passer au middleware suivant
+};
 
 module.exports = { auth, guest };
